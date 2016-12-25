@@ -15,24 +15,25 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 @Lenses("_") final case class LoginState(emailInput: String,
                                          passwordInput: String,
-                                         userId: Option[UserId],
+                                         userId: Maybe[UserId],
                                          emailInvalid: Boolean,
                                          rememberLogin: Boolean)
 
 object Login extends Postables with Gettables with GMClient.Implicits {
 
-  def validatePassword(s: String): Option[String] = {
-    if (s.length >= 8) Option(s) else None
+  def validatePassword(s: String): Maybe[String] = {
+    if (s.length >= 8) Maybe.just(s) else Maybe.empty
   }
 
   import LoginState._
   def component =
     ReactComponentB[(UserId, SessionInfo) => Callback]("Log In Component")
-      .initialState(LoginState("", "", None, false, false))
+      .initialState(LoginState("", "", Maybe.empty, false, false))
       .renderPS { ($, callback, state) =>
         <.form(
           ^.cls := "gm-form"
         )(
+          <.h1("Anmelden"),
           <.div(
               <.input(
                 ^.cls := "gm-form",
@@ -48,10 +49,10 @@ object Login extends Postables with Gettables with GMClient.Implicits {
                                     .isEmpty)
                                 ))
               ),
-              (if (state.emailInvalid)
+              if (state.emailInvalid)
                  <.div(^.cls := "login-error-info")(
                      "Ungültige Email-Adresse.")
-               else EmptyTag),
+               else EmptyTag,
               <.input(
                 ^.cls := "gm-form",
                 ^.placeholder := "password",
@@ -79,9 +80,8 @@ object Login extends Postables with Gettables with GMClient.Implicits {
                   mail <- maybeEmail
                   pw   <- maybePassword
                 } yield (mail, pw)
-                maybeInfo.fold(
-                  $.modState(_emailInvalid.set(maybeEmail.isDefined))
-                ) {
+                maybeInfo.cata(
+                  {
                   case (email, password) =>
                     GMClient.get[Salt](saltGettable(email), implicitly) >>=|
                       (salt => {
@@ -90,14 +90,17 @@ object Login extends Postables with Gettables with GMClient.Implicits {
                          GMClient.post[LoginAttempt, (UserId, SessionInfo)](attempt) >>=~
                            (_.fold(
                                e => Callback.alert(s"Error ${e}"),
-                               callback.tupled
+                               (arg) => Callback.log("Rattenfuß") >> callback.tupled(arg)
                              ))
                          }
                       )
                 }
+                , $.modState(_emailInvalid.set(maybeEmail.isJust)))
               }
             }
-          )("Schnipp-Schnapp"))
+          )("Schnipp-Schnapp"),
+          <.div(<.p("Noch kein Account? Dann schnell ", <.a(^.href := "/#/register")("anmelden"), "."))
+        )
       }
       .build
 }

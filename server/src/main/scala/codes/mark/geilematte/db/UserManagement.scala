@@ -7,10 +7,24 @@ import codes.mark.geilematte.registration.RegistrationLink
 import com.roundeights.hasher.Algo
 import doobie.imports._
 
-import scalaz.{Id, Reader}
+import scalaz.{Id, Maybe, Reader, \/}
+import scalaz.syntax.either._
+import scalaz.syntax.monad._
 import scalaz.concurrent.Task
 
+object UserManagement {
+
+  sealed trait UserDBProblem
+  object UserDBProblem {
+    val notConfirmed:UserDBProblem = UserNotConfirmed
+    val emailOrPasswordWrong:UserDBProblem = EmailOrPasswordWrong
+  }
+  final case object UserNotConfirmed     extends UserDBProblem
+  final case object EmailOrPasswordWrong extends UserDBProblem
+}
+
 trait UserManagement {
+  import UserManagement._
 
   //Drop all session data
   def initUsers = sql"update users set session = NULL".update.run
@@ -36,24 +50,28 @@ trait UserManagement {
       """.update.run.map(_ == 1)
   }
 
-  def getSaltForUser(email: EmailAddress): ConnectionIO[Option[Salt]] = {
+  def getSaltForUser(email: EmailAddress): ConnectionIO[Maybe[Salt]] = {
     val mail = email.toString
     sql"select salt from users where email = $mail"
       .query[String]
       .map(Salt(_))
       .option
+      .map(Maybe.fromOption)
   }
 
   def checkUserPassword(email: EmailAddress,
-                        password: EncryptedPassword): ConnectionIO[Option[UserId]] = {
+                        password: EncryptedPassword): ConnectionIO[UserDBProblem \/ UserId] = {
     val mail = email.toString
     val pwd  = password.hashed
-    sql"""select u_id
-      from users
-      where email = $mail and password = $pwd"""
-      .query[Int]
-      .map(UserId(_))
+    sql"""select (u_id, confirmed) from users where email = $mail and password = $pwd"""
+      .query[(Int, Boolean)]
+      .map{
+        case (id, isConfirmed) =>
+          if(!isConfirmed) UserDBProblem.notConfirmed.left[UserId] else UserId(id).right[UserDBProblem]
+      }
       .option
+      .map(o => Maybe.fromOption(o).\/>(UserDBProblem.emailOrPasswordWrong).join
+      )
   }
 
   def rememberUserLogin(uId:UserId): HmacSecret => ConnectionIO[SessionInfo] =

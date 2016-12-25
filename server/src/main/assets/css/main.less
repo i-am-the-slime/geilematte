@@ -1,5 +1,12 @@
+@import "animate.min.css";
+@import "../fonts/computer-modern-serif/cmun-serif.css";
+
 html {
-    font-family: 'Delius Unicase', sans-serif;
+    font-family: 'Computer Modern Serif', 'Roboto Condensed', 'Helvetica', sans-serif;
+}
+
+h1 {
+    font-family: 'Playfair Display', sans-serif;
 }
 
 .katex { font-size: 1em !important; }
@@ -143,7 +150,7 @@ select
     border: 1px solid #ccc;
     padding: 3%;
     color: #555;
-    font: 95% Arial, Helvetica, sans-serif;
+    font: 95% 'Computer Modern Serif', sans-serif;
 }
 input[type="text"]:focus,
 input[type="password"]:focus,
@@ -157,6 +164,7 @@ input[type="url"]:focus,
 textarea:focus,
 select:focus
 {
+    z-index: 1000;
     box-shadow: 0 0 5px #43D1AF;
     padding: 3%;
     border: 1px solid #43D1AF;
@@ -198,7 +206,18 @@ button.gm-form {
 }
 
 button.gm-form {
+    height: 48px;
     background: #2EBC99;
+    -moz-animation-duration: 0.3s;
+    -moz-animation-delay: 0s;
+    -webkit-animation-duration: 0.3s;
+    -webkit-animation-delay: 0s;
+    animation-duration: 0.3s;
+    animation-delay: 0s;
+}
+
+input.gm-form {
+    margin-bottom: 5px;
 }
 
 .login-error-info {

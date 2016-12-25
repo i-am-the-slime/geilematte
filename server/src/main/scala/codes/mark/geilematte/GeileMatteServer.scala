@@ -7,6 +7,7 @@ import codes.mark.geilematte.Implicits._
 import codes.mark.geilematte.config.{GMConfig, HmacSecret, ThisServersUri}
 import codes.mark.geilematte.db.Database
 import codes.mark.geilematte.html.{GamePage, MainPage}
+import codes.mark.geilematte.logging.Logging
 import codes.mark.geilematte.mail.{MailTransport, templates}
 import codes.mark.geilematte.registration.RegistrationLink
 import org.http4s._
@@ -15,13 +16,19 @@ import org.http4s.server.blaze.BlazeBuilder
 import org.http4s.server.{Server, ServerApp}
 import org.postgresql.util.PSQLException
 import scodec.codecs.implicits._
-
+import db.UserManagement.{UserDBProblem, UserNotConfirmed, EmailOrPasswordWrong}
+import doobie.imports.ConnectionIO
+import scala.concurrent.duration._
+import scalaz.syntax.traverse._
 import scala.util.Random
+import scalaz.\/
 import scalaz.syntax.bind._
+import scalaz.syntax.std.option._
 import scalaz.concurrent.Task
 
 object GeileMatteServer
     extends ServerApp
+    with Logging
     with Database.Implicits
     with EntityEncoders
     with EntityDecoders {
@@ -72,10 +79,11 @@ object GeileMatteServer
           Database.categories.task.attempt.flatMap(
             _.fold(
               damn =>
-                Task.delay(println(s"Damn: $damn")) >> Task.now(
-                  Vector.empty[Category]),
+                Task.delay(println(s"Damn: $damn")) >> Task
+                  .now(Vector.empty[Category]),
               cats => Task.delay(println(s"Wow $cats")) >> Task.now(cats)
-            ))
+            )
+          )
       )(b64T[Vector[Category]])
 
     case req @ POST -> Root / "categories" =>
@@ -92,7 +100,9 @@ object GeileMatteServer
                   _.fold(
                     damn => Task.delay(println(s"Damn: $damn")) >> Task.now(0),
                     id => Task.delay(println(s"Wow $id")) >> Task.now(id)
-                  )))
+                  )
+              )
+          )
       )(b64T[Int])
 
     case req @ POST -> Root / "question4s" =>
@@ -103,10 +113,13 @@ object GeileMatteServer
                .createQuestion4(question)
                .task
                .attempt
-               .flatMap(_.fold(
-                 damn => Task.delay(println(s"Damn: $damn")) >> Task.now(null),
-                 id => Task.delay(println(s"Wow $id")) >> Task.now(id)
-               )))
+               .flatMap(
+                 _.fold(
+                   damn =>
+                     Task.delay(println(s"Damn: $damn")) >> Task.now(null),
+                   id => Task.delay(println(s"Wow $id")) >> Task.now(id)
+                 )
+               ))
       )(b64T[IdQ4])
 
     case req @ GET -> Root / "question4s" => //TODO add query params
@@ -120,7 +133,8 @@ object GeileMatteServer
     case req @ POST -> Root / "guess" =>
       Ok(
         req.as[Guess](fromB64[Guess]) >>=
-          ((guess: Guess) => Database.checkGuess(guess).task))(b64T[Boolean])
+          ((guess: Guess) => Database.checkGuess(guess).task)
+      )(b64T[Boolean])
 
     case req @ POST -> Root / "register" =>
       println(s"I should register $req")
@@ -129,16 +143,24 @@ object GeileMatteServer
            (for {
              link <- Task.delay(
                       RegistrationLink(
-                        Random.alphanumeric.take(30).toList.mkString))
+                        Random.alphanumeric.take(30).toList.mkString
+                      )
+                    )
              mail = templates.welcome(nui.email, link)(config.thisServersUri)
+             _    <- Task.schedule((), 5 seconds)
              user <- Database.addUser(nui, link).task
+             _    <- Task.delay(log.info(s"Sending mail to ${mail.to}"))
              _    <- MailTransport.send(mail)
            } yield user).attempt.unsafePerformSync.fold(
              {
                case ex: PSQLException =>
-                 if (ex.getServerErrorMessage.getConstraint == "users_email_key")
+                 if (ex.getServerErrorMessage.getConstraint == "users_email_key") {
+                   log.info(s"User with email: ${nui.email} already exists")
                    Conflict("Already exists")
-                 else InternalServerError(ex.getMessage)
+                 } else {
+                   log.error(s"Unexpected problem", ex)
+                   InternalServerError(ex.getMessage)
+                 }
              },
              userId => Ok(userId)(b64[UserId])
            )
@@ -154,6 +176,52 @@ object GeileMatteServer
       } else {
         NotFound("Das hat leider nicht geklappt.")
       }
+
+    case req @ GET -> Root / "salt" =>
+      println(s"I should get the salt $req")
+      req.params
+        .get("email")
+        .toMaybe
+        .map(s => { log.info(s"Email param: $s"); s })
+        .flatMap(EmailAddress.fromString)
+        .cata(
+          addr => {
+            Database
+              .getSaltForUser(addr)
+              .task
+              .unsafePerformSync
+              .cata(
+                salt => Ok(salt)(b64[Salt]),
+                NotFound(s"No such user ${addr}")
+              )
+          },
+          BadRequest("Invalid email in request params")
+        )
+
+    case req @ POST -> Root / "login" =>
+      println(s"I should log in now $req")
+      req.as[LoginAttempt](fromB64[LoginAttempt]) >>=
+        (attempt => {
+           val dbIO:ConnectionIO[UserDBProblem \/ SessionInfo] = for {
+             maybeUserId <- Database.checkUserPassword(
+                             attempt.email,
+                             attempt.passwordWithSalt.password
+                           )
+             maybeRemember <- maybeUserId.traverse(
+               (uid:UserId) =>
+                 Database
+                   .rememberUserLogin(uid)(
+                     config.hmacSecret
+                   )
+                 )
+           } yield maybeRemember
+           dbIO.task.unsafePerformSync.fold({
+             case UserNotConfirmed =>
+               PreconditionFailed("User not confirmed")
+             case EmailOrPasswordWrong =>
+               NotFound("Username or Password wrong")
+           }, (info:SessionInfo) => Ok(info)(b64[SessionInfo]))
+         })
   }
 
   override def server(args: List[String]): Task[Server] = {
