@@ -22,9 +22,9 @@ object LoginHandler extends Gettables with Postables with GMClient.Implicits {
            (_.fold(
              handleError,
              (result: (UserId, SessionInfo)) => {
-               if (writeCookies) cookies.write(result._1, result._2)
+               if (writeCookies) cookies.write(result._1, result._2) >>
+                 handleSuccess.tupled(result)
                else
-                 Callback.empty >>
                    handleSuccess.tupled(result)
              }
            ))
@@ -45,6 +45,7 @@ object LoginHandler extends Gettables with Postables with GMClient.Implicits {
     val UidKey     = "uid"
     val SessionKey = "session"
     def write(uid: UserId, si: SessionInfo): Callback = {
+      Callback.log("Writing cookies") >>
       Callback(
         Cookies.write(
           Map(
@@ -52,7 +53,7 @@ object LoginHandler extends Gettables with Postables with GMClient.Implicits {
             SessionKey -> si.unboxed
           )
         )
-      )
+      ) >> Callback.log("written cookies")
     }
     def read: CallbackTo[Maybe[(UserId, SessionInfo)]] = {
       CallbackTo {

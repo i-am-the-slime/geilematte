@@ -72,10 +72,16 @@ object Login extends Postables with Gettables with GMClient.Implicits {
           <.input(
             ^.`type` := "checkbox",
             ^.id := "rememberLoginCheckBox",
-            ^.onChange ==> ((e: ReactEventI) =>
+            ^.onChange ==> ((e: ReactEventI) => {
+                              val setTo = e.target.value
+                              val asBool = setTo match {
+                                case "on"  => true
+                                case "off" => false
+                              }
                               $.modState(
-                                _rememberLogin.set(e.target.value.toBoolean)
-                              ))
+                                _rememberLogin.set(asBool)
+                              )
+                            })
           ),
           <.label(^.`for` := "rememberLoginCheckBox")(" Passwort merken"),
           <.button(
@@ -91,11 +97,8 @@ object Login extends Postables with Gettables with GMClient.Implicits {
                 } yield (mail, pw)
                 maybeInfo.cata({
                   case (email, password) =>
-                    LoginHandler.attempt(
-                      state.rememberLogin,
-                      email,
-                      password,
-                      callback)
+                    LoginHandler
+                      .attempt(state.rememberLogin, email, password, callback)
                 }, $.modState(_emailInvalid.set(maybeEmail.isJust)))
               }
             }
@@ -109,5 +112,11 @@ object Login extends Postables with Gettables with GMClient.Implicits {
           )
         )
       }
+      .componentWillMount(
+        cwm => {
+          LoginHandler.fromCookies >>=
+            (_.cata(cwm.props.tupled, Callback.empty))
+        }
+      )
       .build
 }

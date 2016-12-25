@@ -2,6 +2,7 @@ package codes.mark.geilematte.facades
 
 import org.scalajs.dom.document
 
+import scala.scalajs.js.Date
 import scalaz.std.list._
 
 object Cookies {
@@ -18,9 +19,12 @@ object Cookies {
         })
       .toMap
 
-  def write(values:Map[String, String]): Unit =
-    document.cookie =
-    intersperse(values.toList.map{
-      case (k,v) => s"$k=$v"
-    }, ";").mkString
+  def write(values:Map[String, String]): Unit = {
+    val expiry = new Date(2020, 1)
+    values.toList.foreach {
+        case (k, v) =>
+          val expires = expiry.toUTCString
+          document.cookie = s"$k=$v;expires=$expires;path=/"
+    }
+  }
 }
