@@ -13,16 +13,22 @@ import shapeless.Lazy
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.language.implicitConversions
+import scala.scalajs.js.URIUtils
 import scalaz.\/
 import scalaz.syntax.either._
 
 sealed trait RemoteError {
   def logAlert = Callback.log(this.toString) >> Callback.alert(this.toString)
 }
-final case object Conflict extends RemoteError
+final case object Conflict           extends RemoteError
+final case object NotFound           extends RemoteError
+final case object PreconditionFailed extends RemoteError
+
 object RemoteError {
   def fromStatus(code: Int): RemoteError = code match {
     case 409 => Conflict
+    case 404 => NotFound
+    case 412 => PreconditionFailed
   }
 }
 
@@ -35,8 +41,8 @@ object GMClient {
       }
 
       def >>=#[B](f: A => Future[CallbackTo[B]]): CallbackTo[Future[B]] = {
-        cb.flatMap( (futA: Future[A]) => {
-          CallbackTo.future(futA.flatMap((a:A) => { f(a) }))
+        cb.flatMap((futA: Future[A]) => {
+          CallbackTo.future(futA.flatMap((a: A) => { f(a) }))
         })
       }
 
@@ -45,14 +51,16 @@ object GMClient {
       }
     }
 
-    implicit def cbToFutureUnit2cb(futCB:CallbackTo[Future[Unit]]):Callback = {
+    implicit def cbToFutureUnit2cb(futCB: CallbackTo[Future[Unit]]): Callback = {
       futCB >> Callback.empty
     }
 
-    implicit class RemoteErrorOr[A](a:CallbackTo[Future[RemoteError \/ A]]) {
-      def logErrors(f:A => Callback):Callback = {
-        a.flatMap( future =>
-          Callback.future(future.map(_.fold((re:RemoteError) => re.logAlert, f)))
+    implicit class RemoteErrorOr[A](a: CallbackTo[Future[RemoteError \/ A]]) {
+      def logErrors(f: A => Callback): Callback = {
+        a.flatMap(
+          future =>
+            Callback
+              .future(future.map(_.fold((re: RemoteError) => re.logAlert, f)))
         )
       }
     }
@@ -66,7 +74,7 @@ object GMClient {
 
     CallbackTo.future[A](
       Ajax
-        .get(gettable.url, headers = gettable.headers)
+        .get(URIUtils.encodeURI(gettable.url), headers = gettable.headers)
         .map(
           xmlHttpRequest =>
             CallbackTo[A](fromBase64[A](xmlHttpRequest.responseText))
@@ -76,19 +84,26 @@ object GMClient {
 
   def post[A, B](a: A)(
       implicit postable: Postable[A],
-      codec: Lazy[Codec[B]]): CallbackTo[Future[RemoteError \/ B]] = {
+      codec: Lazy[Codec[B]]
+  ): CallbackTo[Future[RemoteError \/ B]] = {
     CallbackTo.future[RemoteError \/ B](
       Ajax
-        .post(postable.url, postable.toPayload(a), headers = postable.headers)
+        .post(
+          URIUtils.encodeURI(postable.url),
+          postable.toPayload(a),
+          headers = postable.headers
+        )
         .recover { case ex: AjaxException => ex.xhr }
         .map((xmlHttpRequest: XMLHttpRequest) => {
           val status = xmlHttpRequest.status
           if (status == 200) {
             CallbackTo[RemoteError \/ B](
-              fromBase64[B](xmlHttpRequest.responseText).right[RemoteError])
+              fromBase64[B](xmlHttpRequest.responseText).right[RemoteError]
+            )
           } else
             CallbackTo[RemoteError \/ B](
-              RemoteError.fromStatus(status).left[B])
+              RemoteError.fromStatus(status).left[B]
+            )
         })
     )
   }

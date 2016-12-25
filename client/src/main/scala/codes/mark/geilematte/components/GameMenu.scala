@@ -1,7 +1,7 @@
 package codes.mark.geilematte.components
 
 import codes.mark.geilematte.components.Matte
-import codes.mark.geilematte.{Ans, AnswerId, Category, Guess, IdQ4, LatexText, Q4, Question4Id}
+import codes.mark.geilematte.{Ans, AnswerId, Category, Guess, IdQ4, LatexText, Q4, Question4Id, SessionInfo, UserId}
 import codes.mark.geilematte.remote.{GMClient, Postables}
 import codes.mark.geilematte.router.GameMenuPage
 import japgolly.scalajs.react.vdom.prefix_<^._
@@ -18,7 +18,7 @@ import scala.util.{Random, Success}
 object GameMenu {
 
   def component =
-    ReactComponentB[GameMenuPage]("Question Maker Component").render_P(props =>
-      <.div(s"I am holding the place ${props.userId} ${props.session}")
+    ReactComponentB[(UserId, SessionInfo)]("Question Maker Component").render_P(props =>
+      <.div(s"I am holding the place ${props._1} ${props._2}")
     ).build
 }

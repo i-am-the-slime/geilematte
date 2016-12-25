@@ -1,7 +1,7 @@
 package codes.mark.geilematte
 
 import codes.mark.geilematte.BCrypt
-import codes.mark.geilematte.remote.{GMClient, Gettables, Postables}
+import codes.mark.geilematte.remote._
 import japgolly.scalajs.react.vdom.prefix_<^._
 import japgolly.scalajs.react.{Callback, CallbackTo, ReactComponentB, ReactEventI}
 import monocle.macros.Lenses
@@ -89,9 +89,17 @@ object Login extends Postables with Gettables with GMClient.Implicits {
                          val attempt = LoginAttempt(email, enc)
                          GMClient.post[LoginAttempt, (UserId, SessionInfo)](attempt) >>=~
                            (_.fold(
-                               e => Callback.alert(s"Error ${e}"),
-                               (arg) => Callback.log("Rattenfuß") >> callback.tupled(arg)
-                             ))
+                             {
+                               case PreconditionFailed =>
+                                 Callback.alert(s"Zuerst bitte den Bestätigungslink in deiner E-Mail anklicken.")
+                               case NotFound =>
+                                 Callback.alert(s"E-Mail nicht im System, oder Passwort falsch.")
+                               case _ =>
+                                 println("Jacke")
+                                 Callback.alert("Bad, too")
+                             },
+                             callback.tupled
+                           ))
                          }
                       )
                 }
@@ -99,7 +107,7 @@ object Login extends Postables with Gettables with GMClient.Implicits {
               }
             }
           )("Schnipp-Schnapp"),
-          <.div(<.p("Noch kein Account? Dann schnell ", <.a(^.href := "/#/register")("anmelden"), "."))
+          <.div(<.p("Noch kein Account? Dann schnell ", <.a(^.href := "/#/register")("registrieren"), "."))
         )
       }
       .build

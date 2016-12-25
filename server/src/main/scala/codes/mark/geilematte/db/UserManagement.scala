@@ -63,7 +63,7 @@ trait UserManagement {
                         password: EncryptedPassword): ConnectionIO[UserDBProblem \/ UserId] = {
     val mail = email.toString
     val pwd  = password.hashed
-    sql"""select (u_id, confirmed) from users where email = $mail and password = $pwd"""
+    sql"""select u_id, confirmed from users where email = $mail and password = $pwd"""
       .query[(Int, Boolean)]
       .map{
         case (id, isConfirmed) =>
@@ -77,10 +77,11 @@ trait UserManagement {
   def rememberUserLogin(uId:UserId): HmacSecret => ConnectionIO[SessionInfo] =
     (secret: HmacSecret) => {
       val cookieValue = Algo.hmac(secret.secret).sha256(uId.id.toString).hex
+      val userId = uId.id
       sql"""
         update users set
         session = $cookieValue
-        where u_id = ${uId.id}
+        where u_id = $userId
       """.update.run.map(_ => SessionInfo(cookieValue))
     }
 

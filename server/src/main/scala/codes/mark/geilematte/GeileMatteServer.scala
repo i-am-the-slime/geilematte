@@ -147,7 +147,6 @@ object GeileMatteServer
                       )
                     )
              mail = templates.welcome(nui.email, link)(config.thisServersUri)
-             _    <- Task.schedule((), 5 seconds)
              user <- Database.addUser(nui, link).task
              _    <- Task.delay(log.info(s"Sending mail to ${mail.to}"))
              _    <- MailTransport.send(mail)
@@ -202,7 +201,7 @@ object GeileMatteServer
       println(s"I should log in now $req")
       req.as[LoginAttempt](fromB64[LoginAttempt]) >>=
         (attempt => {
-           val dbIO:ConnectionIO[UserDBProblem \/ SessionInfo] = for {
+           val dbIO:ConnectionIO[UserDBProblem \/ (UserId, SessionInfo)] = for {
              maybeUserId <- Database.checkUserPassword(
                              attempt.email,
                              attempt.passwordWithSalt.password
@@ -214,13 +213,16 @@ object GeileMatteServer
                      config.hmacSecret
                    )
                  )
-           } yield maybeRemember
+           } yield for {
+             uid <- maybeUserId
+             rem <- maybeRemember
+           } yield (uid, rem)
            dbIO.task.unsafePerformSync.fold({
              case UserNotConfirmed =>
                PreconditionFailed("User not confirmed")
              case EmailOrPasswordWrong =>
                NotFound("Username or Password wrong")
-           }, (info:SessionInfo) => Ok(info)(b64[SessionInfo]))
+           }, (info:(UserId, SessionInfo)) => Ok(info)(b64[(UserId, SessionInfo)]))
          })
   }
 
