@@ -21,7 +21,7 @@ object templates {
           p("Und hier ist er auch schon: ",
             a(href := link.renderString)(link.renderString)
           ),
-          p("Viel Spaß beim Fönhen"),
+          p("Viel Spaß beim Föhnen"),
           h2("Mark"),
           p("PS: Falls du nicht mit dieser Email gerechnet haben solltest, dann lösche sie bitte einfach, Entschuldigung.")
         )

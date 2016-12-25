@@ -10,6 +10,7 @@ import japgolly.scalajs.react.extra.router.{
   RouterCtl
 }
 import japgolly.scalajs.react.Callback
+import org.scalajs.dom
 
 sealed trait GMPage
 case object LoginPage                                       extends GMPage
@@ -26,22 +27,15 @@ object GMPage {
     implicit val method: Redirect.Method = Redirect.Push
 
     (emptyRule
-      | staticRoute("login", LoginPage) ~> render(
-        Login.component(
-          (id: UserId, info: SessionInfo) =>
-            Callback.log("No luck?") >>
-            Callback(
-//              redirectToPage(GameMenuPage(id.id, info.unboxed))
-              redirectToPath(s"/menu/${id.id}/${info.unboxed}")
-          )
+      | staticRoute("login", LoginPage) ~> renderR(
+        route =>
+          Login.component(
+            (id: UserId, info: SessionInfo) =>
+              route.set(GameMenuPage(id.id, info.unboxed))
         )
       )
-      | staticRoute("register", RegisterPage) ~> render(
-        Register.component(
-          Callback(
-            redirectToPage(LoginPage)
-          )
-        )
+      | staticRoute("register", RegisterPage) ~> renderR(
+        route => Register.component(route.set(LoginPage))
       )
       | staticRoute("not_found", NotFoundPage) ~> render(
         Static.notFound

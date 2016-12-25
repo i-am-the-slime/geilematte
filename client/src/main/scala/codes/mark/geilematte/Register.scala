@@ -131,19 +131,8 @@ object Register extends Postables with GMClient.Implicits {
                       GMClient.post[NewUserInfo, Unit](info) >>=| {
                         case \/-(good) =>
                           $.modState(_sendingEmail.set(true)) >>
-                            Callback.future {
-                              println("Promising")
-                              val p = Promise[Callback]()
-                              setTimeout(3000) { () =>
-                                println("Successing")
-                                p.success(callback)
-                              }
-                              p.future.map {
-                                case cb =>
-                                  println("Futuring")
-                                  cb
-                              }
-                            }
+                            callback.delayMs(5000)
+
                         case -\/(Conflict) =>
                           $.modState(
                             _emailError.set(
