@@ -90,7 +90,7 @@ trait UserManagement {
     val session = info.unboxed
     sql"""
       select count(*) from users where u_id = $userId and session = $session
-    """.query[Int].map(_ == 1).option.map(_.getOrElse(false))
+    """.query[Int].map(_ == 1).unique
   }
 
 
