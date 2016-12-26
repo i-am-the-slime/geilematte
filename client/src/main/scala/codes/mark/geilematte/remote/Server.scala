@@ -21,13 +21,15 @@ sealed trait RemoteError {
   def logAlert = Callback.log(this.toString) >> Callback.alert(this.toString)
 }
 final case object Conflict           extends RemoteError
+final case object Forbidden          extends RemoteError
 final case object NotFound           extends RemoteError
 final case object PreconditionFailed extends RemoteError
 
 object RemoteError {
   def fromStatus(code: Int): RemoteError = code match {
-    case 409 => Conflict
+    case 403 => Forbidden
     case 404 => NotFound
+    case 409 => Conflict
     case 412 => PreconditionFailed
   }
 }

@@ -48,106 +48,117 @@ object Register extends Postables with GMClient.Implicits {
             )
           )
         } else {
-
-          <.form(
-            ^.cls := "gm-form"
-          )(
-            <.h1("Registrieren"),
-            <.div(
-              <.input(
-                ^.cls := "gm-form",
-                ^.width := "99%",
-                ^.placeholder := "your@email.com",
-                ^.`type` := "email",
-                ^.onChange ==> ((e: ReactEventI) =>
-                                  $.modState(_emailInput.set(e.target.value))),
-                ^.onBlur ==> ((e: ReactEventI) =>
-                                $.modState(
-                                  _emailError.set(
-                                    EmailAddress
-                                      .fromString(e.target.value).cata(_ => Maybe.empty,
-                                      Maybe.just("Ungültige Email-Adresse.")
+          <.div(^.cls := "form-wrapper")(
+            <.form(
+              ^.cls := "gm-form",
+              ^.position := "relative",
+              ^.bottom := "0"
+            )(
+              <.h1("Registrieren"),
+              <.div(
+                <.input(
+                  ^.cls := "gm-form",
+                  ^.width := "99%",
+                  ^.placeholder := "your@email.com",
+                  ^.`type` := "email",
+                  ^.onChange ==> ((e: ReactEventI) =>
+                                    $.modState(
+                                      _emailInput.set(e.target.value)
+                                    )),
+                  ^.onBlur ==> ((e: ReactEventI) =>
+                                  $.modState(
+                                    _emailError.set(
+                                      EmailAddress
+                                        .fromString(e.target.value)
+                                        .cata(
+                                          _ => Maybe.empty,
+                                          Maybe
+                                            .just("Ungültige Email-Adresse.")
+                                        )
                                     )
-                                  )
-                                ))
-              ),
-              state.emailError.cata(
-                errMsg =>
-                  <.div(^.cls := "login-error-info animated shake")(errMsg),
-                <.div(^.cls := "login-error-info", ^.visibility := "hidden")(
-                  "Fehlerfrei"
+                                  ))
+                ),
+                state.emailError.cata(
+                  errMsg =>
+                    <.div(^.cls := "login-error-info animated shake")(errMsg),
+                  <.div(^.cls := "login-error-info", ^.visibility := "hidden")(
+                    "Fehlerfrei"
+                  )
+                ),
+                <.input(
+                  ^.cls := "gm-form",
+                  ^.placeholder := "password",
+                  ^.width := "99%",
+                  ^.`type` := "password",
+                  ^.onChange ==> ((e: ReactEventI) => {
+                                    val text = e.target.value
+                                    $.modState(
+                                      _passwordInput.set(text)
+                                        andThen _passwordInvalid.modify(
+                                          inv =>
+                                            if (inv)
+                                              validatePassword(text).isEmpty
+                                            else inv
+                                        )
+                                    )
+                                  }),
+                  ^.onBlur ==> ((e: ReactEventI) =>
+                                  $.modState(
+                                    _passwordInvalid.set(
+                                      validatePassword(e.target.value).isEmpty
+                                    )
+                                  ))
                 )
               ),
-              <.input(
+              if (state.passwordInvalid)
+                <.div(^.cls := "login-error-info animated shake")(
+                  "Muss mindestens 8 Zeichen haben."
+                )
+              else
+                <.div(^.cls := "login-error-info", ^.visibility := "hidden")(
+                  "Fehlerfrei"
+                ),
+              <.button(
                 ^.cls := "gm-form",
-                ^.placeholder := "password",
                 ^.width := "99%",
-                ^.`type` := "password",
-                ^.onChange ==> ((e: ReactEventI) => {
-                                  val text = e.target.value
-                                  $.modState(
-                                    _passwordInput.set(text)
-                                      andThen _passwordInvalid.modify(
-                                        inv =>
-                                          if (inv)
-                                            validatePassword(text).isEmpty
-                                          else inv
-                                      )
-                                  )
-                                }),
-                ^.onBlur ==> ((e: ReactEventI) =>
-                                $.modState(
-                                  _passwordInvalid.set(
-                                    validatePassword(e.target.value).isEmpty
-                                  )
-                                ))
-              )
-            ),
-            if (state.passwordInvalid)
-              <.div(^.cls := "login-error-info animated shake")(
-                "Muss mindestens 8 Zeichen haben."
-              )
-            else
-              <.div(^.cls := "login-error-info", ^.visibility := "hidden")(
-                "Fehlerfrei"
-              ),
-            <.button(
-              ^.cls := "gm-form",
-              ^.width := "99%",
-              ^.onClick ==> { (e: ReactEventI) =>
-                e.preventDefaultCB >>
-                  $.modState(_loading.set(true)) >> {
-                  val maybeEmail    = EmailAddress.fromString(state.emailInput)
-                  val maybePassword = validatePassword(state.passwordInput)
-                  val maybeInfo = for {
-                    mail <- maybeEmail
-                    pw   <- maybePassword
-                    _   = println("encrypting")
-                    enc = BCrypt.encrypt(pw)
-                    _   = println("encrypted")
-                  } yield NewUserInfo(mail, enc)
-                  maybeInfo.cata(
-                    info =>
-                      GMClient.post[NewUserInfo, Unit](info) >>=| {
-                        case \/-(good) =>
-                          $.modState(_sendingEmail.set(true)) >>
-                            callback.delayMs(5000)
+                ^.onClick ==> { (e: ReactEventI) =>
+                  e.preventDefaultCB >>
+                    $.modState(_loading.set(true)) >> {
+                    val maybeEmail    = EmailAddress.fromString(state.emailInput)
+                    val maybePassword = validatePassword(state.passwordInput)
+                    val maybeInfo = for {
+                      mail <- maybeEmail
+                      pw   <- maybePassword
+                      _   = println("encrypting")
+                      enc = BCrypt.encrypt(pw)
+                      _   = println("encrypted")
+                    } yield NewUserInfo(mail, enc)
+                    maybeInfo.cata(
+                      info =>
+                        GMClient.post[NewUserInfo, Unit](info) >>=| {
+                          case \/-(good) =>
+                            $.modState(_sendingEmail.set(true)) >>
+                              callback.delayMs(5000)
 
-                        case -\/(Conflict) =>
-                          $.modState(
-                            _emailError.set(
-                              Maybe.just("E-Mail schon registriert.")
-                            ) andThen _loading.set(false)
-                          )
-                    },
-                    $.modState(_passwordInvalid.set(maybePassword.isJust))
-                  )
+                          case -\/(Conflict) =>
+                            $.modState(
+                              _emailError.set(
+                                Maybe.just("E-Mail schon registriert.")
+                              ) andThen _loading.set(false)
+                            )
+                      },
+                      $.modState(_passwordInvalid.set(maybePassword.isJust))
+                    )
+                  }
                 }
-              }
-            )(
-              <.div(^.cls := (if ($.state.loading) "animated zoomIn" else ""))(
-                if ($.state.loading) Animation.loadingSpinner
-                else "Frisier mich!"
+              )(
+                <.div(
+                  ^.cls := (if ($.state.loading) "animated zoomIn"
+                            else "")
+                )(
+                  if ($.state.loading) Animation.loadingSpinner
+                  else "Frisier mich!"
+                )
               )
             )
           )

@@ -1,7 +1,7 @@
 package codes.mark.geilematte.editor
 
 import codes.mark.geilematte.components.Matte
-import codes.mark.geilematte.{Ans, Category, IdQ4, LatexText, Q4}
+import codes.mark.geilematte._
 import codes.mark.geilematte.remote.GMClient
 import japgolly.scalajs.react.vdom.prefix_<^._
 import japgolly.scalajs.react.{Callback, CallbackTo, ReactComponentB, ReactElement, ReactEventI, ReactNode}
@@ -38,7 +38,7 @@ import scala.util.Success
 object QuestionCreator {
   import QuestionCreatorState._
   def component =
-    ReactComponentB[Unit]("Question Maker Component")
+    ReactComponentB[(UserId, SessionInfo, Callback)]("Question Maker Component")
       .initialState(
         QuestionCreatorState(
           "Question",
@@ -53,14 +53,18 @@ object QuestionCreator {
           false,
           None
         ))
-      .renderS {
-        case (scope, state) => {
+      .renderPS {
+        case (scope, props, state) => {
 
           def clicked(e: ReactEventI): Callback = {
             e.preventDefaultCB >>
               scope.modState(_.copy(result = None)) >>
-              GMClient.post[Q4, IdQ4](state.toQ4) logErrors
-              ((idQ4: IdQ4) => scope.modState(_.copy(result = Option(idQ4.id))))
+              GMClient.post[NewQuestionPost, IdQ4](NewQuestionPost(state.toQ4, props._1, props._2)) >>=~
+              (_.fold(
+                err => props._3,
+                (idQ4: IdQ4) => scope.modState(_.copy(result = Option(idQ4.id)))
+              )
+              )
           }
 
           def changePreview(l: Lens[QuestionCreatorState, Boolean], t: Lens[QuestionCreatorState, String]) = {
@@ -94,7 +98,7 @@ object QuestionCreator {
 
           <.div(^.cls := "enemy")(
             <.div(^.cls := "enemyImage",
-                  ^.backgroundImage := "url('https://media.giphy.com/media/h55EUEsTG9224/giphy.gif')"),
+                  ^.backgroundImage := "url('/public/img/cow.gif')"),
             <.div(^.cls := "questionAndAnswer")(
               <.div(^.cls := "question")(
                 changePreview(_previewingQuestion, _qInput)

@@ -1,6 +1,6 @@
 package codes.mark.geilematte.remote
 
-import codes.mark.geilematte.{Category, EmailAddress, Guess, IdQ4, LoginAttempt, NewUserInfo, Q4, Salt, SessionCheck, UserId}
+import codes.mark.geilematte.{Category, EmailAddress, Guess, IdQ4, LoginAttempt, NewQuestionPost, NewUserInfo, Q4, Salt, SessionCheck, SessionInfo, UserId}
 import org.scalajs.dom.ext.Ajax.InputData
 import scodec.Codec
 import scodec.codecs.implicits._
@@ -28,10 +28,10 @@ trait Postables {
       Codec.encode(a).require.toBase64
   }
 
-  implicit val q4Postable:Postable[Q4] = new Postable[Q4] {
+  implicit val newQuestionPostable:Postable[NewQuestionPost] = new Postable[NewQuestionPost] {
     override def url = "api/question4s"
 
-    override def toPayload(a: Q4): InputData =
+    override def toPayload(a: NewQuestionPost): InputData =
       Codec.encode(a).require.toBase64
   }
 

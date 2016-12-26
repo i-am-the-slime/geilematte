@@ -12,6 +12,7 @@ import doobie.postgres.pgtypes._
 import com.roundeights.hasher.Implicits._
 import com.roundeights.hasher.{Hasher, Algo}
 import scala.language.postfixOps
+import scalaz.syntax.applicative._
 
 import scala.util.Random
 import scalaz.Reader
@@ -32,6 +33,5 @@ object Database extends UserManagement with Editor with Fights {
       lazy val task: Task[A] = cio.transact[Task](xa)
     }
   }
-
 
 }

@@ -1,5 +1,6 @@
 package codes.mark.geilematte.db
 
+import codes.mark.geilematte.MattePermissions.{MatteAdmin, MatteEditor, MatteUser}
 import codes.mark.geilematte._
 import codes.mark.geilematte.config.HmacSecret
 import com.roundeights.hasher.Implicits._
@@ -93,5 +94,15 @@ trait UserManagement {
     """.query[Int].map(_ == 1).unique
   }
 
+  def canEdit(uId:UserId): ConnectionIO[Boolean] = {
+    val userId = uId.id
+    sql"""
+      select permissions from users where u_id = $userId
+    """.query[MattePermissions].map{
+      case MatteEditor => true
+      case MatteAdmin => true
+      case MatteUser => false
+    }.option.map(_.getOrElse(false))
+  }
 
 }

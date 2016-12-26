@@ -16,12 +16,18 @@ import org.http4s.server.blaze.BlazeBuilder
 import org.http4s.server.{Server, ServerApp}
 import org.postgresql.util.PSQLException
 import scodec.codecs.implicits._
-import db.UserManagement.{UserDBProblem, UserNotConfirmed, EmailOrPasswordWrong}
+import db.UserManagement.{
+  EmailOrPasswordWrong,
+  UserDBProblem,
+  UserNotConfirmed
+}
 import doobie.imports.ConnectionIO
+import scalaz.syntax.applicative._
+
 import scala.concurrent.duration._
 import scalaz.syntax.traverse._
 import scala.util.Random
-import scalaz.\/
+import scalaz.{Maybe, \/}
 import scalaz.syntax.bind._
 import scalaz.syntax.std.option._
 import scalaz.concurrent.Task
@@ -106,21 +112,24 @@ object GeileMatteServer
       )(b64T[Int])
 
     case req @ POST -> Root / "question4s" =>
-      Ok(
-        req.as[Q4](fromB64[Q4]) >>=
-          ((question: Q4) =>
-             Database
-               .createQuestion4(question)
-               .task
-               .attempt
-               .flatMap(
-                 _.fold(
-                   damn =>
-                     Task.delay(println(s"Damn: $damn")) >> Task.now(null),
-                   id => Task.delay(println(s"Wow $id")) >> Task.now(id)
-                 )
-               ))
-      )(b64T[IdQ4])
+      req.as[NewQuestionPost](fromB64[NewQuestionPost]) >>=
+        ((data: NewQuestionPost) =>
+           (for {
+             loggedIn <- Database.checkSession(data.userId, data.sessionInfo)
+             canEdit  <- Database.canEdit(data.userId)
+             maybeId <- if(loggedIn && canEdit)
+                           Database.createQuestion4(data.q4).map(Maybe.just)
+                         else
+                           Maybe.empty[IdQ4].pure[ConnectionIO]
+
+           } yield maybeId).task
+             .map(
+               _.cata(
+                 id => Ok(id)(b64[IdQ4]),
+                 Forbidden("Fergett it!")
+               )
+             )
+             .unsafePerformSync)
 
     case req @ GET -> Root / "question4s" => //TODO add query params
       Ok(
@@ -201,36 +210,54 @@ object GeileMatteServer
       println(s"I should log in now $req")
       req.as[LoginAttempt](fromB64[LoginAttempt]) >>=
         (attempt => {
-           val dbIO:ConnectionIO[UserDBProblem \/ (UserId, SessionInfo)] = for {
-             maybeUserId <- Database.checkUserPassword(
-                             attempt.email,
-                             attempt.passwordWithSalt.password
-                           )
-             maybeRemember <- maybeUserId.traverse(
-               (uid:UserId) =>
-                 Database
-                   .rememberUserLogin(uid)(
-                     config.hmacSecret
-                   )
-                 )
-           } yield for {
-             uid <- maybeUserId
-             rem <- maybeRemember
-           } yield (uid, rem)
-           dbIO.task.unsafePerformSync.fold({
-             case UserNotConfirmed =>
-               PreconditionFailed("User not confirmed")
-             case EmailOrPasswordWrong =>
-               NotFound("Username or Password wrong")
-           }, (info:(UserId, SessionInfo)) => Ok(info)(b64[(UserId, SessionInfo)]))
+           val dbIO: ConnectionIO[UserDBProblem \/ (UserId, SessionInfo)] =
+             for {
+               maybeUserId <- Database.checkUserPassword(
+                               attempt.email,
+                               attempt.passwordWithSalt.password
+                             )
+               maybeRemember <- maybeUserId.traverse(
+                                 (uid: UserId) =>
+                                   Database
+                                     .rememberUserLogin(uid)(
+                                       config.hmacSecret
+                                   )
+                               )
+             } yield
+               for {
+                 uid <- maybeUserId
+                 rem <- maybeRemember
+               } yield (uid, rem)
+           dbIO.task.unsafePerformSync.fold(
+             {
+               case UserNotConfirmed =>
+                 PreconditionFailed("User not confirmed")
+               case EmailOrPasswordWrong =>
+                 NotFound("Username or Password wrong")
+             },
+             (info: (UserId, SessionInfo)) =>
+               Ok(info)(b64[(UserId, SessionInfo)])
+           )
          })
 
     case req @ POST -> Root / "check_session" =>
-    println(s"I should check the session")
-    req.as[SessionCheck](fromB64[SessionCheck]) >>=
-      (check => {
-        Ok(Database.checkSession(check.uid, check.session).task.unsafePerformSync)(b64[Boolean])
-      })
+      println(s"I should check the session")
+      req.as[SessionCheck](fromB64[SessionCheck]) >>=
+        (check => {
+           Ok(
+             Database
+               .checkSession(check.uid, check.session)
+               .task
+               .unsafePerformSync
+           )(b64[Boolean])
+         })
+
+    case req @ POST -> Root / "can_edit" =>
+      println(s"I should check if a user is allowed to edit")
+      req.as[UserId](fromB64[UserId]) >>=
+        (uid => {
+           Ok(Database.canEdit(uid).task.unsafePerformSync)(b64[Boolean])
+         })
   }
 
   override def server(args: List[String]): Task[Server] = {

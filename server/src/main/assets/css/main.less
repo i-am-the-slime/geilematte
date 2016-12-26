@@ -1,13 +1,25 @@
 @import "animate.min.css";
 @import "../fonts/computer-modern-serif/cmun-serif.css";
 
+@images: "../img/";
+@brunette: '../img/brunette.jpg';
+@blonde: '../img/blonde.jpg';
+@hairbrown: #402912;
+
+@hairbrown-light: @hairbrown + #333;
+
+@turquoise: #43D1AF;
+
+@background: #fff5ed;
+
 html {
     font-family: 'Computer Modern Serif', 'Roboto Condensed', 'Helvetica', sans-serif;
+    background-color: #fcbfcb;
 }
 
 h1 {
     font-family: 'Playfair Display', sans-serif;
-    background: #43D1AF;
+    background: url("@{brunette}") repeat-x;
     padding: 20px 0;
     font-size: 140%;
     font-weight: 300;
@@ -59,10 +71,6 @@ h1 {
     rgba(255,255,255, 0.8) 67%,
     rgba(255,255,255, 0) 100%
     );
-}
-
-.input {
-
 }
 
 .questionAndAnswer {
@@ -127,10 +135,14 @@ h1 {
     max-width: 400px;
     margin: 10px auto;
     padding: 16px;
-    background: #F7F7F7;
+    background: @background;
 }
+
+a {
+    color: @hairbrown;
+}
+
 .gm-form h1{
-    background: #43D1AF;
     padding: 20px 0;
     font-size: 140%;
     font-weight: 300;
@@ -180,9 +192,9 @@ textarea:focus,
 select:focus
 {
     z-index: 1000;
-    box-shadow: 0 0 5px #43D1AF;
+    box-shadow: 0 0 5px @hairbrown;
     padding: 3%;
-    border: 1px solid #43D1AF;
+    border: 1px solid @hairbrown;
 }
 
 .gm-form input[type="submit"],
@@ -193,7 +205,6 @@ select:focus
     -moz-box-sizing: border-box;
     width: 100%;
     padding: 3%;
-    background: #43D1AF;
     border-bottom: 2px solid #30C29E;
     border-top-style: none;
     border-right-style: none;
@@ -212,23 +223,20 @@ button.gm-form {
     -moz-box-sizing: border-box;
     width: 100%;
     padding: 3%;
-    background: #43D1AF;
-    border-bottom: 2px solid #30C29E;
+    background-color: @hairbrown;
+    border-bottom: 2px solid @hairbrown-light;
     border-top-style: none;
     border-right-style: none;
     border-left-style: none;
     color: #fff;
-}
-
-button.gm-form {
     height: 48px;
-    background: #2EBC99;
     -moz-animation-duration: 0.3s;
     -moz-animation-delay: 0s;
     -webkit-animation-duration: 0.3s;
     -webkit-animation-delay: 0s;
     animation-duration: 0.3s;
     animation-delay: 0s;
+    font-family: 'Playfair Display', serif;
 }
 
 input.gm-form {
@@ -241,3 +249,10 @@ input.gm-form {
     color: crimson;
     text-align: center;
 }
+
+.form-wrapper
+{
+    position: relative;
+    height: 100%;
+}
+

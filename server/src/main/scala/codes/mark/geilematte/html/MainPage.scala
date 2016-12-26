@@ -9,7 +9,7 @@ object MainPage {
       title := "Geile Matte, Alter",
       link(rel := "stylesheet", href := "https://fonts.googleapis.com/css?family=Playfair+Display|Roboto+Condensed"),
       link(rel := "stylesheet", href := "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.6.0/katex.min.css"),
-      link(rel := "stylesheet", media := "screen", href := s"public/css/main.less"),
+      link(rel := "stylesheet", media := "screen", href := s"public/css/main.css"),
       script(src := "public/js/twin-bcrypt.min.js"),
       script(src := "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.6.0/katex.min.js")
     ),
