@@ -27,7 +27,7 @@ object App extends js.JSApp with Gettables {
 
     //React
     val container = document.getElementById("react-container")
-    val router = Router(BaseUrl.fromWindowOrigin / "#/", GMPage.routerConfig.logToConsole)
+    val router = Router(BaseUrl.fromWindowOrigin / "#/", GMPage.routerConfig)
     router() render container
   }
 }

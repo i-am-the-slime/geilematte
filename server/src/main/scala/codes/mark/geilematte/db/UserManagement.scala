@@ -85,4 +85,13 @@ trait UserManagement {
       """.update.run.map(_ => SessionInfo(cookieValue))
     }
 
+  def checkSession(uId:UserId, info:SessionInfo): ConnectionIO[Boolean] =  {
+    val userId = uId.id
+    val session = info.unboxed
+    sql"""
+      select count(*) from users where u_id = $userId and session = $session
+    """.query[Int].map(_ == 1).option.map(_.getOrElse(false))
+  }
+
+
 }

@@ -114,7 +114,7 @@ object Login extends Postables with Gettables with GMClient.Implicits {
       }
       .componentWillMount(
         cwm => {
-          LoginHandler.fromCookies >>=
+          LoginHandler.fromCookies >>=~
             (_.cata(cwm.props.tupled, Callback.empty))
         }
       )

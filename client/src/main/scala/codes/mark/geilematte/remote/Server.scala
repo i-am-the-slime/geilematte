@@ -72,6 +72,7 @@ object GMClient {
   def get[A](implicit gettable: Gettable[A],
              codec: Lazy[Codec[A]]): CallbackTo[Future[A]] = {
 
+    Callback.log(s"Getting from ${gettable.url}") >>
     CallbackTo.future[A](
       Ajax
         .get(URIUtils.encodeURI(gettable.url), headers = gettable.headers)
@@ -86,6 +87,7 @@ object GMClient {
       implicit postable: Postable[A],
       codec: Lazy[Codec[B]]
   ): CallbackTo[Future[RemoteError \/ B]] = {
+    Callback.log(s"Posting $a to ${postable.url}") >>
     CallbackTo.future[RemoteError \/ B](
       Ajax
         .post(

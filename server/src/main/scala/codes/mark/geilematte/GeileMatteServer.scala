@@ -224,6 +224,13 @@ object GeileMatteServer
                NotFound("Username or Password wrong")
            }, (info:(UserId, SessionInfo)) => Ok(info)(b64[(UserId, SessionInfo)]))
          })
+
+    case req @ POST -> Root / "check_session" =>
+    println(s"I should check the session")
+    req.as[SessionCheck](fromB64[SessionCheck]) >>=
+      (check => {
+        Ok(Database.checkSession(check.uid, check.session).task.unsafePerformSync)(b64[Boolean])
+      })
   }
 
   override def server(args: List[String]): Task[Server] = {
